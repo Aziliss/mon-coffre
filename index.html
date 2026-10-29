@@ -377,7 +377,7 @@ var ITEMS=[
  {id:'etoile',e:'🌟',n:'Étoile tombée',r:2},{id:'dragon',e:'🐉',n:'Dragon de nuage',r:2},{id:'cle',e:'🗝️',n:'Clé du ciel',r:2}
 ];
 var RAR=[{n:'Commun',c:'#F6E9CC'},{n:'Rare',c:'#B9A3F0'},{n:'Légendaire',c:'linear-gradient(135deg,#FFE3A0,#F4BC4C 55%,#F08BB0)'}];
-var KINDS={virement:{l:'Virement',ic:'🏦'},'case':{l:'Case',ic:'🟨'},taxe:{l:'Taxe plaisir',ic:'🍰'},fun:{l:'Reste fun',ic:'🎈'},bonus:{l:'Bonus',ic:'✨'}};
+var KINDS={virement:{l:'Virement',ic:'🏦'},'case':{l:'Case',ic:'🟨'},taxe:{l:'Taxe plaisir',ic:'🍰'},fun:{l:'Reste fun',ic:'🎈'},bonus:{l:'Bonus',ic:'✨'},retrait:{l:'Retrait',ic:'➖'}};
 var BADGES=[
  {id:'first',e:'🥄',n:'Premier repas',d:'1er versement',t:function(c){return c.count>=1;}},
  {id:'c10',e:'🟨',n:'Dix cases',d:'10 cases cochées',t:function(c){return c.cases>=10;}},
@@ -413,7 +413,7 @@ function frac(t){var tg=S.settings.target;return tg>0?Math.max(0,Math.min(1,t/tg
 function stageIdx(t){var f=frac(t),i=0;STAGES.forEach(function(w,j){if(f>=w.f-1e-9)i=j;});return i;}
 function casesSet(){var s=new Set();S.entries.forEach(function(e){if(e.kind==='case')s.add(e.n);});return s;}
 function monthSum(ym){return S.entries.filter(function(e){return e.d.slice(0,7)===ym;}).reduce(function(s,e){return s+e.amt;},0);}
-function daysSinceFed(){if(!S.entries.length)return null;var last=S.entries.map(function(e){return e.d;}).sort().pop();return dayDiff(last,today());}
+function daysSinceFed(){var F=S.entries.filter(function(e){return e.amt>0;});if(!F.length)return null;var last=F.map(function(e){return e.d;}).sort().pop();return dayDiff(last,today());}
 function streakInfo(){
  var d=new Date();if(!S.days[keyOf(d)])d.setDate(d.getDate()-1);
  var n=0;while(S.days[keyOf(d)]){n++;d.setDate(d.getDate()-1);}
@@ -422,8 +422,8 @@ function streakInfo(){
  return {n:n,best:Math.max(best,n)};
 }
 function earnedBadges(){
- var plan=S.settings.plan,months={};S.entries.forEach(function(e){months[e.d.slice(0,7)]=1;});
- var c={count:S.entries.length,cases:casesSet().size,best:streakInfo().best,items:S.items.length,
+ var plan=S.settings.plan,months={},pos=S.entries.filter(function(e){return e.amt>0;});pos.forEach(function(e){months[e.d.slice(0,7)]=1;});
+ var c={count:pos.length,cases:casesSet().size,best:streakInfo().best,items:S.items.length,
   taxes:S.entries.filter(function(e){return e.kind==='taxe';}).length,
   monthOk:plan>0&&Object.keys(months).some(function(m){return monthSum(m)>=plan;})};
  return BADGES.filter(function(b){return b.t(c);}).map(function(b){return b.id;});
@@ -1134,6 +1134,8 @@ var actions={
   onOk:function(v){var a=num(v.amt);if(!(a>0))return 'Indique un montant supérieur à 0.';this.after=function(){addEntry('fun',a,'Reste du budget fun');};}});},
  bonus:function(){openSheet({title:'Bonus tombé du ciel',sub:'Prime, remboursement, vente, cadeau : un festin pour Pépite.',fields:[{key:'amt',label:'Montant',suffix:'€'},{key:'lab',label:'D’où ça vient ?',type:'text',ph:'Prime de fin d’année'}],ok:'Offrir le festin',no:'Je garde tout pour moi',noToast:'Pépite fait semblant de ne pas avoir vu',
   onOk:function(v){var a=num(v.amt);if(!(a>0))return 'Indique un montant supérieur à 0.';var lab=v.lab;this.after=function(){addEntry('bonus',a,lab||'Bonus');};}});},
+ retrait:function(){var t=total();if(!(t>0)){toast('Le coffre est vide, rien à retirer');return;}openSheet({title:'Retirer un montant',sub:'Pour corriger une erreur ou sortir de l’argent du coffre. Total actuel : '+fmt(t)+'.',fields:[{key:'amt',label:'Montant à retirer',suffix:'€'},{key:'lab',label:'Pourquoi ?',type:'text',ph:'Correction : versement pas fait'}],ok:'Retirer',no:'Annuler',
+  onOk:function(v){var a=Math.round(num(v.amt)*100)/100;if(!(a>0))return 'Indique un montant supérieur à 0.';if(a>total()+1e-9)return 'Tu ne peux pas retirer plus que le total ('+fmt(total())+').';var lab=v.lab;this.after=function(){var from=total();S.entries.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),d:today(),kind:'retrait',amt:-a,label:lab||'Correction'});persist();render();countUp(from,total());toast('−'+fmt(a)+' retiré du coffre');};}});},
  random:function(){var cs=casesSet(),left=[];for(var i=1;i<=100;i++)if(!cs.has(i))left.push(i);if(!left.length)return;openCase(left[Math.floor(Math.random()*left.length)],true);},
  dayok:function(){markDay('ok');},
  joker:function(){markDay('joker');},
@@ -1259,8 +1261,8 @@ function render(){
 
  '<section><h2>Badges</h2><p class="sub">'+eb.length+' sur '+BADGES.length+' débloqués.</p><div class="badges">'+BADGES.map(function(b){return '<div class="badge'+(eb.indexOf(b.id)>=0?'':' off')+'"><div class="medal">'+b.e+'</div><b>'+b.n+'</b><span>'+b.d+'</span></div>';}).join('')+'</div></section>'+
 
- '<section><h2>Historique</h2>'+
-  (hist.length?'<ul class="card folk hist" style="padding:4px 0">'+hist.map(function(e){var K=KINDS[e.kind]||KINDS.bonus;return '<li><span class="ic">'+K.ic+'</span><span class="lab">'+esc(e.label||K.l)+'<small>'+fmtDate(e.d)+'</small></span><span class="amt">+'+fmt(e.amt)+'</span><button class="x" data-del="'+e.id+'" aria-label="Supprimer ce versement">×</button></li>';}).join('')+'</ul>'
+ '<section><div class="g-head"><h2>Historique</h2><button class="btn btn-ghost" data-act="retrait">➖ Retirer un montant</button></div><p class="sub">Erreur sur un versement entier ? Touche × à côté pour le supprimer.</p>'+
+  (hist.length?'<ul class="card folk hist" style="padding:4px 0">'+hist.map(function(e){var K=KINDS[e.kind]||KINDS.bonus;return '<li><span class="ic">'+K.ic+'</span><span class="lab">'+esc(e.label||K.l)+'<small>'+fmtDate(e.d)+'</small></span><span class="amt"'+(e.amt<0?' style="color:var(--muted)"':'')+'>'+(e.amt<0?'−'+fmt(-e.amt):'+'+fmt(e.amt))+'</span><button class="x" data-del="'+e.id+'" aria-label="Supprimer ce versement">×</button></li>';}).join('')+'</ul>'
    :'<div class="empty">Pépite n’a encore rien mangé. Touche Nourrir en bas de l’écran.</div>')+'</section>'+
 
  '<details class="card"'+(settingsOpen?' open':'')+'><summary>Réglages</summary><form id="settings">'+
