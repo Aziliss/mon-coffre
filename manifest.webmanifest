@@ -1,0 +1,17 @@
+{
+  "name": "Mon Coffre",
+  "short_name": "Mon Coffre",
+  "description": "Le jeu d'épargne de Pépite : fais pousser l'arbre jusqu'à ton appart à Toulouse.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1C20",
+  "theme_color": "#0B1C20",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
