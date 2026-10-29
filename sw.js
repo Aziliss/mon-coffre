@@ -1,5 +1,5 @@
 /* Mon Coffre : fonctionnement hors connexion */
-const CACHE = 'mon-coffre-v3';
+const CACHE = 'mon-coffre-v4';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
@@ -18,6 +18,9 @@ self.addEventListener('fetch', e => {
   }
   if (url.origin !== location.origin) return;
   // Pages : réseau d'abord (pour recevoir les mises à jour), cache si hors ligne
+  const scopePath = new URL(self.registration.scope).pathname;
+  const isRoot = url.pathname === scopePath || url.pathname === scopePath + 'index.html';
+  if (req.mode === 'navigate' && !isRoot) return;
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); return res; }).catch(() => caches.match('./index.html')));
     return;
